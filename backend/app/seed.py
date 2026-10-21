@@ -1,0 +1,85 @@
+"""Idempotent bootstrap: tables, template registry and fictional demonstration data.
+All people, addresses and numbers below are invented."""
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db import Base, engine
+from app.models import orm
+from app.services.auth import hash_password
+from app.templates.builder import TEMPLATES, ensure_templates, template_file
+
+DEMO_PASSWORD = "demo-pass"
+VERIFY = {"declaration_address": ["identity_verified", "facts_checked_with_client"],
+          "declaration_name": ["identity_verified", "facts_checked_with_client"],
+          "declaration_general": ["identity_verified", "facts_checked_with_client"]}
+
+
+def seed_templates(session: Session) -> None:
+    for key, spec in TEMPLATES.items():
+        for version in spec["versions"]:
+            exists = session.scalar(select(orm.TemplateVersion).where(
+                orm.TemplateVersion.template_key == key, orm.TemplateVersion.version == version,
+                orm.TemplateVersion.tenant_id.is_(None)))
+            if exists:
+                continue
+            superseded = key == "declaration_address" and version == "1.0"
+            session.add(orm.TemplateVersion(
+                tenant_id=None, template_key=key, version=version, workspace=spec["workspace"], title=spec["title"],
+                file_name=template_file(key, version).name, is_demo=True, approved=not superseded,
+                jurisdiction=spec.get("jurisdiction"), verify_fields=VERIFY.get(key, []),
+                source_note=("Superseded by v1.1. Kept for the audit trail." if superseded
+                             else "Bundled demonstration template. Replace with your own approved wording."),
+                last_verified=None))
+    session.commit()
+
+
+def _tenant(session: Session, name: str) -> orm.Tenant:
+    t = session.scalar(select(orm.Tenant).where(orm.Tenant.name == name))
+    if not t:
+        t = orm.Tenant(name=name)
+        session.add(t)
+        session.commit()
+    return t
+
+
+def _user(session: Session, tenant: orm.Tenant, email: str, name: str, role: str) -> None:
+    if not session.scalar(select(orm.User).where(orm.User.email == email)):
+        session.add(orm.User(tenant_id=tenant.id, email=email, name=name, role=role,
+                             password_hash=hash_password(DEMO_PASSWORD)))
+        session.commit()
+
+
+def _party(session: Session, tenant: orm.Tenant, **kw) -> None:
+    if not session.scalar(select(orm.Party).where(orm.Party.tenant_id == tenant.id, orm.Party.full_name == kw["full_name"])):
+        session.add(orm.Party(tenant_id=tenant.id, **kw))
+        session.commit()
+
+
+def seed_demo(session: Session) -> None:
+    a = _tenant(session, "Kapoor & Associates (demo)")
+    b = _tenant(session, "Lakeside Services (demo)")
+    _user(session, a, "owner@demo.test", "Demo Owner", "owner")
+    _user(session, a, "operator@demo.test", "Demo Operator", "operator")
+    _user(session, a, "viewer@demo.test", "Demo Viewer", "viewer")
+    _user(session, b, "other@demo.test", "Other Business Owner", "owner")
+    _party(session, a, kind="landlord", full_name="Meera Kapoor", verified=True, phone="9000000001",
+           address="Flat 12, Sunrise Apartments, Baner Road, Pune 411045")
+    _party(session, a, kind="landlord", full_name="Arjun Desai", verified=True, phone="9000000002",
+           address="7 Orchard Lane, Kothrud, Pune 411038")
+    _party(session, a, kind="supplier", full_name="Sharma Office Supplies", phone="9000000003",
+           address="Shop 4, Market Yard, Pune")
+    _party(session, b, kind="landlord", full_name="Private Landlord of Lakeside", verified=True,
+           address="1 Hidden Road, Nashik")
+
+
+def bootstrap() -> None:
+    ensure_templates()
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        seed_templates(session)
+        seed_demo(session)
+
+
+if __name__ == "__main__":
+    bootstrap()
+    print("Seeded. Demo logins: owner@demo.test / operator@demo.test / viewer@demo.test, password:", DEMO_PASSWORD)

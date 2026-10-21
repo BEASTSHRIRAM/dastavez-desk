@@ -83,6 +83,7 @@ class Case(TenantOwned, Base):
     transcript: Mapped[str | None] = mapped_column(Text)  # original spoken/typed input, preserved verbatim
     template_version_id: Mapped[str | None] = mapped_column(ForeignKey("template_versions.id"))
     idempotency_key: Mapped[str | None] = mapped_column(String(80))
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)  # workspace payloads, e.g. form mapping
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     facts: Mapped[list["Fact"]] = relationship(back_populates="case", cascade="all, delete-orphan")

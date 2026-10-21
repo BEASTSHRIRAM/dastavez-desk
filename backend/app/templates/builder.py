@@ -80,7 +80,7 @@ TEMPLATES: dict[str, dict] = {
             ("p", "2. Monthly rent is {{ monthly_rent }}, payable by day {{ rent_due_day }} of each month."),
             ("p", "3. Security deposit is {{ security_deposit }}. Total payable at the start is {{ first_payment_total }}."),
             ("p", "4. Either party may end the tenancy by giving {{ notice_period_days }} days' written notice."),
-            ("if", "furnished", [("p", "5. The property is let with the furnishings listed in the handover checklist.")]),
+            ("if", "furnished_flag", [("p", "5. The property is let with the furnishings listed in the handover checklist.")]),
             ("fixed", "These terms are a draft for review by the parties and do not create obligations until agreed and signed by them."),
             ("note", "Signatures: to be added by the parties in person."),
         ]},
@@ -269,11 +269,33 @@ def build_template(key: str, version: str, spec: dict) -> Path:
     return path
 
 
+SAMPLE_FORM = FILES_DIR / "sample_demo_form.docx"
+SAMPLE_FORM_FIELDS = ["Full name", "Date of birth", "Mobile number", "Residential address", "Father's name", "Place of birth"]
+
+
+def build_sample_form() -> Path:
+    """A fictional form so the field-mapping flow can be tried. It is NOT an official form."""
+    doc = Document()
+    p = doc.add_paragraph()
+    _run(p, "SAMPLE DEMONSTRATION FORM. NOT AN OFFICIAL FORM.", bold=True, size=13)
+    _run(doc.add_paragraph(), "Used only to try Dastavez Desk's form-field mapping.", italic=True, size=9.5, color=RULE)
+    table = doc.add_table(rows=0, cols=2)
+    table.style = "Table Grid"
+    for label in SAMPLE_FORM_FIELDS:
+        cells = table.add_row().cells
+        _run(cells[0].paragraphs[0], label, bold=True, size=10)
+    FILES_DIR.mkdir(parents=True, exist_ok=True)
+    doc.save(SAMPLE_FORM)
+    return SAMPLE_FORM
+
+
 def ensure_templates(force: bool = False) -> None:
     for key, spec in TEMPLATES.items():
         for version in spec["versions"]:
             if force or not template_file(key, version).exists():
                 build_template(key, version, spec)
+    if force or not SAMPLE_FORM.exists():
+        build_sample_form()
 
 
 if __name__ == "__main__":
