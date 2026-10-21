@@ -73,6 +73,12 @@ PROPERTY = WorkspaceConfig(
                   help="One item per line. Used for the handover checklist."),
     ],
     rules=[
+        # Party fields hold a hint (a name, or True for "use the saved one"); the resolver turns it into a record.
+        ExtractRule(field_id="landlord_party", kind="name", patterns=[
+            rf"\blandlord(?:\s+is|\s+named|:)?\s+(?P<v>{NAME})"]),
+        ExtractRule(field_id="landlord_party", kind="yesno", yes=[
+            r"landlord\s+(?:is\s+)?already\s+saved", r"\b(?:saved|existing|selected)\s+landlord\b",
+            r"\breuse\b.{0,40}\blandlord\b"]),
         ExtractRule(field_id="tenant_name", kind="name", patterns=[
             rf"\btenant(?:\s+is|\s+named|\s+name\s+is|:)?\s+(?P<v>{NAME})"]),
         ExtractRule(field_id="monthly_rent", kind="amount", keywords=[r"\brent\b(?:\s+(?:is|of|will be|at))?"], window=30),

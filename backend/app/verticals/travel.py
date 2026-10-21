@@ -88,9 +88,10 @@ TRAVEL = WorkspaceConfig(
         ExtractRule(field_id="applicant_name", kind="name", patterns=[
             rf"\b(?:applicant|traveller|traveler|client|customer)(?:'s)?(?:\s+name)?(?:\s+is|\s+named|:)?\s+(?P<v>{NAME})"]),
         ExtractRule(field_id="nationality", kind="text", patterns=[
-            r"\bnationality\s*(?:is|:)\s*(?P<v>[A-Za-z]+)", r"\b(?P<v>[A-Z][a-z]+)\s+(?:national|citizen|passport holder)\b"]),
+            r"\bnationality\s*(?:is|:)\s*(?P<v>[A-Za-z]+)",
+            r"\b(?P<v>(?-i:[A-Z][a-z]+))\s+(?:national|citizen|passport holder)\b"]),
         ExtractRule(field_id="destination", kind="text", patterns=[
-            r"\b(?:travell?ing|travel|going|trip|visa)\s+to\s+(?P<v>[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)"]),
+            r"\b(?:travell?ing|travel|going|trip|visa)\s+to\s+(?P<v>(?-i:[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?))"]),
         ExtractRule(field_id="trip_start", kind="date", keywords=[r"\bfrom\b", r"\bdepart\w*(?:\s+on)?\b", r"\bleaving(?:\s+on)?\b"], window=30),
         ExtractRule(field_id="trip_end", kind="date", keywords=[r"\buntil\b", r"\btill\b", r"\breturn\w*(?:\s+on)?\b", r"\bto\b(?=\s+\d|\s+(?:the\s+)?\w+\s+\w+\s+\d)"], window=30),
         ExtractRule(field_id="trip_purpose", kind="select", choices={

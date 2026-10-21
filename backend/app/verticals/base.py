@@ -9,7 +9,7 @@ from app.models.fields import FieldSpec, Issue
 
 # A name is 1-4 words, case-insensitive, and must not start with filler words that appear after
 # phrases such as "the landlord is already saved".
-NAME = (r"(?!(?:already|saved|same|existing|selected|my|our|the|a|an|yesterday|today|tomorrow|not|new|unknown)\b)"
+NAME = (r"(?!(?:is|are|was|named|has|have|already|saved|same|existing|selected|my|our|the|a|an|yesterday|today|tomorrow|not|new|unknown)\b)"
         r"[A-Za-z][A-Za-z.'-]*(?:\s+(?!(?:and|has|is|was|lives|wants|needs|with|of|from|at|the|date|rent|"
         r"deposit|paid|on|for|to|who|whose|will|should|please|use|ask|change|create|prepare|begins|starts|"
         r"purchase|bought|by)\b)[A-Za-z][A-Za-z.'-]*){0,3}")
