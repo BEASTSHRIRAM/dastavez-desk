@@ -1,0 +1,28 @@
+{
+  "_note": "Administrator-maintained requirements. Every entry must name a source and a last_verified date. The entries below are FICTIONAL demonstration data, not real visa rules.",
+  "destinations": {
+    "Demoland": {
+      "is_demo": true,
+      "source": "Demonstration dataset bundled with Dastavez Desk. Fictional. Replace with an administrator-approved source.",
+      "last_verified": null,
+      "items": [
+        {"label": "Passport valid for the whole trip", "note": "Check the validity rule published by the destination."},
+        {"label": "Completed application form"},
+        {"label": "Recent passport-size photographs"},
+        {"label": "Accommodation confirmation or host invitation", "when": {"field": "accommodation", "present": true}},
+        {"label": "Proof of funds supplied by the applicant"},
+        {"label": "Employment or business letter supplied by the applicant", "when": {"field": "occupation", "present": true}}
+      ]
+    },
+    "Sampleland": {
+      "is_demo": true,
+      "source": "Demonstration dataset bundled with Dastavez Desk. Fictional. Replace with an administrator-approved source.",
+      "last_verified": null,
+      "items": [
+        {"label": "Passport"},
+        {"label": "Return travel plan supplied by the applicant"},
+        {"label": "Travel insurance certificate, if the destination asks for it"}
+      ]
+    }
+  }
+}
