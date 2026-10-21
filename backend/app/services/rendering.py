@@ -3,10 +3,13 @@
 Preview and export share one pipeline: the same template is rendered twice, once with plain values
 (the file the operator downloads) and once with ⟦field¦value⟧ markers (so the preview can highlight
 every filled field and link it back to its input). What the operator reviews is what is exported."""
+import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -145,25 +148,70 @@ def _soffice() -> str | None:
     return None
 
 
+def _word_installed() -> bool:
+    """Microsoft Word on Windows can convert DOCX to PDF with full fidelity through COM automation."""
+    if sys.platform != "win32" or not shutil.which("powershell"):
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\winword.exe"):
+            return True
+    except OSError:
+        return False
+
+
+def pick_converter() -> str | None:
+    """'soffice' (LibreOffice), 'word', or None. LibreOffice is preferred: it runs headless and in servers."""
+    if _soffice():
+        return "soffice"
+    return "word" if _word_installed() else None
+
+
 def pdf_available() -> bool:
-    return _soffice() is not None
+    return pick_converter() is not None
+
+
+# Word allows one automation client at a time, so conversions through it are serialised.
+_word_lock = threading.Lock()
+_WORD_SCRIPT = (
+    "$ErrorActionPreference='Stop';$w=$null;"
+    "try{$w=New-Object -ComObject Word.Application;$w.Visible=$false;$w.DisplayAlerts=0;"
+    "$d=$w.Documents.Open($env:DASTAVEZ_IN,$false,$true);$d.ExportAsFixedFormat($env:DASTAVEZ_OUT,17);$d.Close($false)}"
+    "finally{if($w){$w.Quit()}}"
+)
+
+
+def _convert_with_word(docx: Path, out: Path) -> None:
+    env = {**os.environ, "DASTAVEZ_IN": str(docx.resolve()), "DASTAVEZ_OUT": str(out.resolve())}
+    with _word_lock:
+        subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", _WORD_SCRIPT],
+                       check=True, capture_output=True, timeout=120, env=env)
+
+
+def _convert_with_soffice(exe: str, docx: Path, out: Path) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run([exe, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(docx)],
+                       check=True, capture_output=True, timeout=120, env={**os.environ, "HOME": tmp})
+        produced = Path(tmp) / f"{docx.stem}.pdf"
+        if produced.exists():
+            shutil.move(str(produced), out)
 
 
 def docx_to_pdf(docx: Path, out: Path) -> Path:
-    exe = _soffice()
-    if not exe:
-        raise PdfUnavailable("PDF export needs LibreOffice. Install it or set SOFFICE_PATH, then retry. "
-                             "The DOCX file is ready now.")
+    converter = pick_converter()
+    if converter is None:
+        raise PdfUnavailable("PDF export needs LibreOffice or Microsoft Word on the server. Install one (or set "
+                             "SOFFICE_PATH), then retry. The DOCX file is ready now.")
     out.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory() as tmp:
-        try:
-            subprocess.run([exe, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(docx)],
-                           check=True, capture_output=True, timeout=120,
-                           env={**__import__("os").environ, "HOME": tmp})
-        except (subprocess.SubprocessError, OSError) as exc:
-            raise PdfUnavailable(f"PDF conversion failed ({exc.__class__.__name__}). The DOCX file is ready.") from exc
-        produced = Path(tmp) / f"{docx.stem}.pdf"
-        if not produced.exists() or produced.stat().st_size == 0:
-            raise PdfUnavailable("PDF conversion produced no file. The DOCX file is ready.")
-        shutil.move(str(produced), out)
+    out.unlink(missing_ok=True)
+    try:
+        if converter == "word":
+            _convert_with_word(docx, out)
+        else:
+            _convert_with_soffice(_soffice() or "", docx, out)
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise PdfUnavailable(f"PDF conversion with {'Microsoft Word' if converter == 'word' else 'LibreOffice'} failed "
+                             f"({exc.__class__.__name__}). The DOCX file is ready.") from exc
+    if not out.exists() or out.stat().st_size == 0:
+        raise PdfUnavailable("PDF conversion produced no file. The DOCX file is ready.")
     return out

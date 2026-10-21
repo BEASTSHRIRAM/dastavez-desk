@@ -128,7 +128,7 @@ def test_export_is_idempotent_and_audited():
 
 def test_pdf_failure_is_reported_honestly(monkeypatch):
     from app.services import rendering
-    monkeypatch.setattr(rendering, "_soffice", lambda: None)
+    monkeypatch.setattr(rendering, "pick_converter", lambda: None)
     h = login()
     case = new_case(h, "property", RENT_TEXT)
     m = manifest(h, case["id"])

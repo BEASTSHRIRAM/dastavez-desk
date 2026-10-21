@@ -146,7 +146,7 @@ export function ExportView({ options, caseData, busy, onExport, onDownload, onFi
           ))}
           {!options.pdf_available && options.documents.some((d) => d.formats.includes("pdf")) && (
             <Notice kind="warning" title="PDF export is not available on this server">
-              PDF needs LibreOffice installed on the server (or SOFFICE_PATH set). Word files work now, and you can convert them yourself.
+              PDF needs LibreOffice or Microsoft Word on the server (or SOFFICE_PATH set). Word files work now, and you can convert them yourself.
             </Notice>
           )}
           <Button onClick={() => onExport(Object.fromEntries(Object.entries(pick).map(([k, s]) => [k, [...s]])))} busy={busy === "export"} disabled={total === 0}>
