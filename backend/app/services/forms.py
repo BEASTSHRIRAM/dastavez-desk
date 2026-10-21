@@ -57,6 +57,20 @@ def inspect_form(path: Path, ext: str) -> list[str]:
     return out[:200]
 
 
+def read_text_for_extraction(path: Path, ext: str, limit: int = 20000) -> str:
+    """Plain text of an uploaded notes file, for fact extraction. Treated strictly as data."""
+    try:
+        if ext == ".docx":
+            doc = Document(str(path))
+            parts = [p.text for p in doc.paragraphs] + [c.text for t in doc.tables for r in t.rows for c in r.cells]
+            return "\n".join(parts)[:limit]
+        if ext in (".txt", ".csv"):
+            return path.read_text(encoding="utf-8", errors="replace")[:limit]
+    except (OSError, ValueError, KeyError):
+        return ""
+    return ""
+
+
 def suggest_mapping(form_fields: list[str], config: WorkspaceConfig) -> dict[str, str]:
     """form label -> field_id, using exact label and alias matches only. Anything unsure stays unmapped
     for the operator to map by hand."""
