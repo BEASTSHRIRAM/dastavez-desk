@@ -24,6 +24,7 @@ def test_approved_rental_agreement_exports_as_a_real_pdf_with_the_reviewed_value
     pdf = next(d for d in out["documents"] if d["fmt"] == "pdf")
     r = client.get(f"/api/documents/{pdf['id']}/download", headers=h)
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF-")
-    text = "".join(page.extract_text() for page in PdfReader(io.BytesIO(r.content)).pages)
+    text = " ".join("".join(page.extract_text() for page in PdfReader(io.BytesIO(r.content)).pages).split())  # lines wrap in a PDF
+    assert "Rupees Eighteen Thousand only" in text
     for expected in ("RENTAL AGREEMENT", "Rahul Sharma", "Rs. 18,000.00", "Rs. 68,000.00", "30 September 2027"):
         assert expected in text, expected
