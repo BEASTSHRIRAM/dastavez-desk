@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+/* Design tokens. Bond paper, blue-black ink, one cobalt accent. */
+:root {
+  --paper: #e8e5dc;
+  --sheet: #fbfaf6;
+  --ink: #14171f;
+  --ink-2: #2b303c;
+  --muted: #5d6270;
+  --rule: #b8b3a5;
+  --rule-soft: #d3cfc3;
+  --cobalt: #1f43d6;
+  --cobalt-soft: #dde3fa;
+  --ochre: #94610f;
+  --ochre-soft: #f3e6c8;
+  --danger: #a8231c;
+  --danger-soft: #f6dcd9;
+  --ok: #2b6648;
+  --ok-soft: #d8eadf;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-cobalt: var(--cobalt);
+  --color-cobalt-soft: var(--cobalt-soft);
+  --color-ochre: var(--ochre);
+  --color-ochre-soft: var(--ochre-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --font-display: var(--font-newsreader), Georgia, serif;
+  --font-sans: var(--font-schibsted), system-ui, sans-serif;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+  /* faint paper grain so the page reads as stock, not a screen */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .08  0 0 0 0 .09  0 0 0 0 .12  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--cobalt);
+  color: var(--sheet);
+}
+
+/* Document typography: drafts read as documents, in the serif. */
+.doc {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  font-variation-settings: "opsz" 16;
+}
+.doc h1 { font-size: 1.5rem; line-height: 1.25; font-weight: 600; letter-spacing: 0.01em; font-variation-settings: "opsz" 36; }
+
+/* A value the system filled in: underlined like a pencil mark so the operator can see what changed. */
+.filled {
+  background: linear-gradient(transparent 62%, var(--cobalt-soft) 62%);
+  border-bottom: 1px solid var(--cobalt);
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+.filled:hover, .filled[data-active="true"] { background: var(--cobalt-soft); }
+.filled[data-state="suggested"] { border-bottom-style: dashed; }
+.filled[data-state="missing"] { background: var(--danger-soft); border-bottom-color: var(--danger); }
+
+.drafting-grid {
+  background-image:
+    linear-gradient(var(--rule-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+@media print {
+  body { background: white; }
+  .no-print { display: none !important; }
+}

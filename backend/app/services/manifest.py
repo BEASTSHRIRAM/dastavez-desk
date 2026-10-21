@@ -160,6 +160,9 @@ def _review(m: ManifestInput) -> UiManifest:
             title="Supporting documents", items=ev.computed["checklist"], source=ev.computed.get("requirements_source"),
             last_verified=ev.computed.get("requirements_verified"))]))
     sections.append(Section(title="Where each value came from", components=[_evidence(m)]))
+    if not m.approved:
+        sections.append(Section(title="Edit details", description="Correct anything the draft got wrong. The draft updates after you save.",
+                                components=[_field_component(m, s) for s in ev.active]))
     return UiManifest(case_id=m.case.id, stage="review", title="Review the draft",
                       subtitle="Nothing is exported until you approve it.", sections=sections)
 
