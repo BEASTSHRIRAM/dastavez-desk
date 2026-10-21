@@ -115,8 +115,13 @@ def compare_with_template(template: Path, context: dict[str, Any]) -> list[dict[
         if isinstance(item, Paragraph):
             handle(item.text)
         else:
+            in_loop = False  # rows between {%tr for %} and {%tr endfor %} belong to a list, not fixed wording
             for row in item.rows:
-                if any("{%tr" in c.text for c in row.cells):
+                markers = " ".join(c.text for c in row.cells)
+                if "{%tr" in markers:
+                    in_loop = "endfor" not in markers
+                    continue
+                if in_loop:
                     continue
                 for cell in row.cells:
                     handle(cell.text)
