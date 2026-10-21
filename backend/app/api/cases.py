@@ -289,9 +289,12 @@ def list_events(case_id: str, after: int = 0, p: Principal = Depends(deps.princi
 
 @router.get("/cases/{case_id}/events/stream")
 def stream_events(case_id: str, request: Request, after: int = 0, max_seconds: int = 600,
-                  p: Principal = Depends(deps.principal), session: Session = Depends(deps.get_session)):
-    """Server-Sent Events. Only typed progress messages are sent, never model reasoning."""
-    load(session, p, case_id)  # 404 before the stream opens
+                  p: Principal = Depends(deps.principal)):
+    """Server-Sent Events. Only typed progress messages are sent, never model reasoning.
+    No request-scoped DB session here: one held open for the whole stream would sit 'idle in
+    transaction' and block schema work such as CREATE INDEX CONCURRENTLY."""
+    with db.SessionLocal() as check:
+        load(check, p, case_id)  # 404 before the stream opens; the session closes immediately
 
     def gen():
         last, started, idle = after, time.monotonic(), 0

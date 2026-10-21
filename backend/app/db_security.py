@@ -7,11 +7,15 @@ from sqlalchemy.engine import Engine
 
 
 def lock_down_postgres(engine: Engine) -> int:
-    """Returns the number of tables locked. Safe to call repeatedly."""
+    """Returns the number of tables newly locked. Already-locked tables are skipped, so a steady-state
+    call takes no table locks at all."""
     if engine.dialect.name != "postgresql":
         return 0
     with engine.begin() as conn:
-        tables = conn.execute(text("select tablename from pg_tables where schemaname = 'public'")).scalars().all()
+        conn.execute(text("SET LOCAL lock_timeout = '15s'"))  # fail loudly instead of waiting forever
+        tables = conn.execute(text(
+            "select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+            "where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity")).scalars().all()
         for name in tables:
             quoted = '"' + name.replace('"', '""') + '"'  # names come from the catalog, quoted defensively anyway
             conn.execute(text(f"ALTER TABLE public.{quoted} ENABLE ROW LEVEL SECURITY"))

@@ -81,7 +81,23 @@ def bootstrap() -> None:
         seed_templates(session)
         if get_settings().seed_demo:
             seed_demo(session)
+    if not engine.dialect.name.startswith("sqlite"):
+        _prepare_postgres_checkpoints()
     lock_down_postgres(engine)
+
+
+def _prepare_postgres_checkpoints() -> None:
+    """Create the LangGraph checkpoint tables once, at startup, before any request holds a transaction
+    (its setup builds indexes CONCURRENTLY, which waits for every open transaction). A cancelled earlier
+    attempt can leave an INVALID index behind; drop those so setup rebuilds them."""
+    from sqlalchemy import text
+    from app.agents.checkpoint import get_checkpointer
+    with engine.begin() as conn:
+        bad = conn.execute(text("select c.relname from pg_index i join pg_class c on c.oid = i.indexrelid "
+                                "where not i.indisvalid and c.relname like 'checkpoint%'")).scalars().all()
+        for name in bad:
+            conn.execute(text('DROP INDEX IF EXISTS public."' + name.replace('"', '""') + '"'))
+    get_checkpointer()
 
 
 if __name__ == "__main__":
