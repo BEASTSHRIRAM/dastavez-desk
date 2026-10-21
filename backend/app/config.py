@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     llm_model: str = ""
     stt_provider: str = "demo"
     stt_api_key: str = ""
+    groq_api_key: str = ""  # one key serves both LLM_PROVIDER=groq and STT_PROVIDER=groq
+    groq_llm_model: str = "llama-3.3-70b-versatile"
+    groq_stt_model: str = "whisper-large-v3-turbo"
     soffice_path: str = ""
 
     max_upload_bytes: int = 10 * 1024 * 1024

@@ -19,15 +19,18 @@ class SttFailed(RuntimeError):
 def transcribe(audio: bytes, filename: str, content_type: str, language: str | None = None,
                settings: Settings | None = None) -> str:
     s = settings or get_settings()
-    if s.stt_provider != "openai" or not s.stt_api_key:
+    providers = {"openai": ("https://api.openai.com/v1", s.stt_api_key, "whisper-1"),
+                 "groq": ("https://api.groq.com/openai/v1", s.groq_api_key, s.groq_stt_model)}
+    base, key, model = providers.get(s.stt_provider, ("", "", ""))
+    if not key:
         raise SttUnavailable("No speech service is configured on the server. Use the browser microphone "
                              "transcript or type your request instead.")
     try:
         r = httpx.post(
-            "https://api.openai.com/v1/audio/transcriptions",
-            headers={"authorization": f"Bearer {s.stt_api_key}"},
+            f"{base}/audio/transcriptions",
+            headers={"authorization": f"Bearer {key}"},
             files={"file": (filename, audio, content_type)},
-            data={"model": "whisper-1", **({"language": language} if language else {})},
+            data={"model": model, **({"language": language} if language else {})},
             timeout=120,
         )
         r.raise_for_status()

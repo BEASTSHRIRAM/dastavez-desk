@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useAuth, useRequireAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { ToastProvider } from "./ui";
 import { useReduce3D } from "./scene/Stage";
 
@@ -24,7 +25,7 @@ export function Wordmark({ onDark = false }: { onDark?: boolean }) {
 /** Authenticated frame: a slim ink rail on the left, the working area on the right. */
 export function Shell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   const session = useRequireAuth();
-  const { logout } = useAuth();
+  const { logout, refresh } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { reduced, setReduced } = useReduce3D();
@@ -52,6 +53,13 @@ export function Shell({ children, wide = false }: { children: ReactNode; wide?: 
         <p className="font-medium text-sheet">{session.user.name}</p>
         <p>{session.user.role}, {session.business.name}</p>
       </div>
+      {session.user.role === "owner" && (
+        <label className="flex cursor-pointer items-start gap-2">
+          <input type="checkbox" checked={session.business.ai_consent} className="mt-1 h-4 w-4 accent-cobalt"
+            onChange={(e) => api.setConsent(e.target.checked).then(refresh).catch(() => {})} />
+          <span>Allow AI services<span className="block text-[0.75rem] text-sheet/50">Sends text and audio to the configured provider.</span></span>
+        </label>
+      )}
       <label className="flex cursor-pointer items-center gap-2">
         <input type="checkbox" checked={reduced} onChange={(e) => setReduced(e.target.checked)} className="h-4 w-4 accent-cobalt" />
         Reduce 3D and motion

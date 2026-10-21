@@ -51,7 +51,7 @@ def capabilities(p: Principal = Depends(deps.principal), session: Session = Depe
     s = get_settings()
     tenant = cat.get_tenant(session, p.tenant_id)
     return {"demo_mode": s.llm_provider == "demo", "llm_provider": s.llm_provider, "stt_provider": s.stt_provider,
-            "server_transcription": s.stt_provider != "demo" and bool(s.stt_api_key),
+            "server_transcription": (s.stt_provider == "groq" and bool(s.groq_api_key)) or (s.stt_provider == "openai" and bool(s.stt_api_key)),
             "pdf_available": rendering.pdf_available(), "ai_consent": tenant.ai_consent}
 
 
