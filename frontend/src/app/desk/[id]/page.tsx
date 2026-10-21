@@ -171,7 +171,7 @@ function Desk() {
         <aside className="min-w-0 space-y-8 xl:sticky xl:top-6 xl:self-start" aria-label="Validation and activity">
           {reviewing && approval?.component === "approval_panel" && (
             <ApprovalPanelView panel={approval} busy={busy === "approve"} canWrite={!!canWrite}
-              onFix={jumpToField} onApprove={(confirm, note) => run("approve", async () => { setView(undefined); cs.apply(await api.approve(id, confirm, note || undefined)); }, "Draft approved.")} />
+              onFix={jumpToField} onApprove={(confirm, note, acknowledge) => run("approve", async () => { setView(undefined); cs.apply(await api.approve(id, confirm, note || undefined, acknowledge)); }, "Draft approved.")} />
           )}
           {status === "awaiting_input" && c.pending?.fields && (
             <Notice kind="warning" title="Why I stopped">I paused because {c.pending.fields.length} required or uncertain detail{c.pending.fields.length !== 1 ? "s were" : " was"} not clear from your request.</Notice>

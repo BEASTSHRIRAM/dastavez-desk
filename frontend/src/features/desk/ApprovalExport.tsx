@@ -13,14 +13,17 @@ const display = (v: unknown) => (typeof v === "boolean" ? (v ? "Yes" : "No") : S
 
 export function ApprovalPanelView({ panel, busy, onApprove, onFix, canWrite }: {
   panel: Approval; busy: boolean; canWrite: boolean;
-  onApprove: (confirm: string[], note: string) => void; onFix: (fieldId: string) => void;
+  onApprove: (confirm: string[], note: string, acknowledge: string[]) => void; onFix: (fieldId: string) => void;
 }) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [acked, setAcked] = useState<Set<string>>(new Set());
   const [note, setNote] = useState("");
   const errors = panel.issues.filter((i) => i.severity === "error");
-  const warnings = panel.issues.filter((i) => i.severity === "warning");
+  const ackKeys = new Set(panel.acknowledgements.map((a) => a.key));
+  const warnings = panel.issues.filter((i) => i.severity === "warning" && !(i.key && ackKeys.has(i.key)));
   const allChecked = panel.confirm_fields.every((f) => checked.has(f.field_id));
-  const ready = panel.can_approve && allChecked && canWrite;
+  const allAcked = panel.acknowledgements.every((a) => acked.has(a.key));
+  const ready = panel.can_approve && allChecked && allAcked && canWrite;
 
   if (panel.approved) {
     return <Notice kind="ok" title="Approved">The reviewed values are locked in. Export the documents below, or reopen the draft to change something (it will need approving again).</Notice>;
@@ -46,6 +49,23 @@ export function ApprovalPanelView({ panel, busy, onApprove, onFix, canWrite }: {
     <section aria-label="Approval" className="space-y-5 border border-ink bg-sheet p-5">
       <h2 className="font-display text-2xl">Approve this draft</h2>
       {issueList(errors, "error")}
+      {panel.acknowledgements.length > 0 && (
+        <fieldset className="border border-danger bg-danger-soft p-3">
+          <legend className="px-1 font-semibold text-danger">Possible details from another client</legend>
+          <p className="text-[0.875rem] text-ink-2">These may be left over from another client&apos;s document. Tick each one once you have checked it belongs here.</p>
+          <ul className="mt-2 space-y-2">
+            {panel.acknowledgements.map((a) => (
+              <li key={a.key}>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input type="checkbox" className="mt-1 h-4 w-4 accent-cobalt" checked={acked.has(a.key)}
+                    onChange={(e) => setAcked((cur) => { const n = new Set(cur); e.target.checked ? n.add(a.key) : n.delete(a.key); return n; })} />
+                  <span>{a.message}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
       {issueList(warnings, "warning")}
       {panel.confirm_fields.length > 0 && (
         <fieldset>
@@ -74,11 +94,11 @@ export function ApprovalPanelView({ panel, busy, onApprove, onFix, canWrite }: {
       </div>
       <ul className="space-y-1 text-[0.875rem] text-muted">{panel.disclaimers.map((d) => <li key={d}>{d}</li>)}</ul>
       <div className="flex flex-wrap items-center gap-4">
-        <Button onClick={() => onApprove([...checked], note)} disabled={!ready} busy={busy}>Approve draft</Button>
+        <Button onClick={() => onApprove([...checked], note, [...acked])} disabled={!ready} busy={busy}>Approve draft</Button>
         {!ready && <p className="text-[0.875rem] text-muted" aria-live="polite">
           {!canWrite ? "Your role can't approve drafts."
             : !panel.can_approve ? "Resolve the items above first."
-            : "Tick every value above to approve."}
+            : "Tick every value and check above to approve."}
         </p>}
       </div>
     </section>

@@ -195,6 +195,8 @@ function ComponentView({ c, form, errors, handlers, onEdit }: {
       return <ChangeComparison title={c.title} sections={c.sections} />;
     case "document_preview":
       return c.unavailable ? <Notice kind="warning" title={c.title}>{c.unavailable}</Notice> : <DocumentPaper blocks={c.blocks as never} docKey={c.doc_key} />;
+    case "client_message":
+      return <ClientMessageView title={c.title} text={c.text} />;
     case "approval_panel":
     case "export_options":
       return null; // rendered by the review and export stages, which own their actions
@@ -206,6 +208,23 @@ function ComponentView({ c, form, errors, handlers, onEdit }: {
       );
     }
   }
+}
+
+function ClientMessageView({ title, text }: { title: string; text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="border border-rule bg-sheet p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-display text-xl">{title}</h3>
+        <button type="button" className="text-[0.9375rem] underline decoration-rule underline-offset-4 hover:text-cobalt"
+          onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { /* clipboard blocked: the text is selectable below */ } }}>
+          {copied ? "Copied" : "Copy message"}
+        </button>
+      </div>
+      <pre className="mt-2 whitespace-pre-wrap font-sans text-[0.9375rem] text-ink-2" tabIndex={0} aria-label={title}>{text}</pre>
+      <p className="mt-2 text-[0.8125rem] text-muted">Nothing is sent from here. Paste it into WhatsApp or email yourself.</p>
+    </div>
+  );
 }
 
 function FormAttachment({ c, handlers }: { c: Extract<Component, { component: "file_attachment" }>; handlers: Handlers }) {
@@ -263,6 +282,7 @@ export function ReviewCenter({ manifest, handlers, serverErrors }: { manifest: M
   const previews = comps.filter((c): c is Extract<Component, { component: "document_preview" }> => c.component === "document_preview");
   const comparisons = comps.filter((c): c is Extract<Component, { component: "change_comparison" }> => c.component === "change_comparison");
   const checklist = comps.filter((c) => c.component === "document_checklist");
+  const messages = comps.filter((c) => c.component === "client_message");
   const evidence = comps.filter((c) => c.component === "source_evidence");
   const editSection = manifest.sections.find((s) => s.title === "Edit details");
   const editFields = fieldsIn(editSection?.components ?? []);
@@ -319,6 +339,7 @@ export function ReviewCenter({ manifest, handlers, serverErrors }: { manifest: M
         <ComponentView key={c.doc_key} c={c} form={form} errors={errors} handlers={handlers} />
       ))}
       {checklist.map((c, i) => <ComponentView key={i} c={c} form={form} errors={errors} handlers={handlers} />)}
+      {messages.map((c, i) => <ComponentView key={`m${i}`} c={c} form={form} errors={errors} handlers={handlers} />)}
       {evidence.map((c, i) => (
         <section key={i} aria-labelledby="evidence-h">
           <h2 id="evidence-h" className="mb-2 font-display text-2xl">Where each value came from</h2>

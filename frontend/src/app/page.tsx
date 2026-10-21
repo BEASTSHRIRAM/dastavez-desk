@@ -21,6 +21,12 @@ const STEPS = [
   ["Export", "Download the files. The audit trail stays with the case."],
 ];
 
+const DIFFERENT = [
+  ["Your wording, not ours", "Upload a past draft. The studio finds the parts that change, and the rest stays exactly as you wrote it."],
+  ["Catches what a tired eye misses", "It checks for another client's details in a draft, names spelled two ways, and amounts that disagree with their words."],
+  ["Asks only for the gaps", "When something is missing it writes the request for you to send to the client. It never sends anything itself."],
+];
+
 const LIMITS = [
   "It prepares drafts from your approved templates. It does not give legal advice or sign, stamp or notarise anything.",
   "It never submits an application, makes a booking or moves money.",
@@ -106,6 +112,18 @@ export default function Landing() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-[1280px] px-5 pb-20 sm:px-10">
+        <h2 className="font-display text-3xl leading-tight sm:text-4xl">Built for offices with their own wording</h2>
+        <div className="mt-8 grid gap-8 sm:grid-cols-3">
+          {DIFFERENT.map(([t, d]) => (
+            <div key={t} className="border-t border-ink pt-4">
+              <p className="font-display text-[1.3rem] leading-snug">{t}</p>
+              <p className="mt-2 text-ink-2">{d}</p>
+            </div>
+          ))}
         </div>
       </section>
 

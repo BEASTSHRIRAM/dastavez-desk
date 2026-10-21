@@ -100,6 +100,23 @@ export interface CaseRow { id: string; workspace: string; title: string; status:
 export interface TemplateInfo {
   id: string; key: string; version: string; workspace: string; title: string; is_demo: boolean; approved: boolean;
   jurisdiction: string | null; verify_fields: string[]; note: string | null; last_verified: string | null;
+  owned_by_business: boolean; fields: { id: string; label: string; type: string; required: boolean }[];
+}
+export interface StudioCandidate {
+  text: string; kind: string; count: number; context: string; field_id: string; label: string; type: string;
+  required: boolean; high_impact: boolean; include: boolean; occurrence: number | null; link_to: string | null;
+  options: string[] | null; source: string; note: string | null;
+}
+export interface StudioAnalysis {
+  upload_id: string; filename: string; candidates: StudioCandidate[]; warnings: string[]; agent: { used: boolean; note: string };
+}
+export interface StudioSelection {
+  text: string; field_id: string; label: string; type: string; required: boolean; high_impact: boolean;
+  occurrence: number | null; link_to: string | null; options: string[] | null;
+}
+export interface StudioBuilt {
+  template: TemplateInfo; preview: Record<string, unknown>[]; leftovers: { text: string; kind: string; context: string }[];
+  problems: string[]; replaced: Record<string, number>;
 }
 export interface Capabilities { demo_mode: boolean; llm_provider: string; stt_provider: string; server_transcription: boolean; pdf_available: boolean; ai_consent: boolean }
 export interface WorkflowEvent { id: number; type: string; message: string; data: Record<string, unknown>; created_at: string }
@@ -117,8 +134,20 @@ export const api = {
   parties: (kind?: string) => json<{ id: string; kind: string; full_name: string; address: string | null }[]>(`/api/parties${kind ? `?kind=${kind}` : ""}`),
 
   cases: () => json<CaseRow[]>("/api/cases"),
-  createCase: (workspace: string, idempotencyKey: string) =>
-    post<CaseOut & { created: boolean }>("/api/cases", { workspace }, { "Idempotency-Key": idempotencyKey }),
+  createCase: (workspace: string, idempotencyKey: string, templateKey?: string) =>
+    post<CaseOut & { created: boolean }>("/api/cases", { workspace, template_key: templateKey }, { "Idempotency-Key": idempotencyKey }),
+  studioAnalyze: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return json<StudioAnalysis>("/api/studio/analyze", { method: "POST", body: form });
+  },
+  studioBuild: (body: {
+    upload_id: string; title: string; source_name?: string; jurisdiction?: string; template_key?: string;
+    add_verification_checks: boolean; selections: StudioSelection[];
+  }) => post<StudioBuilt>("/api/studio/build", body),
+  approveTemplate: (id: string) => post<TemplateInfo>(`/api/templates/${id}/approve`),
+  retireTemplate: (id: string) => post<TemplateInfo>(`/api/templates/${id}/retire`),
+  templatePreview: (id: string) => json<{ template: TemplateInfo; blocks: Record<string, unknown>[] }>(`/api/templates/${id}/preview`),
   getCase: (id: string) => json<CaseOut>(`/api/cases/${id}`),
   manifest: async (id: string, view?: string): Promise<Manifest> =>
     parseManifest(await json(`/api/cases/${id}/manifest${view ? `?view=${view}` : ""}`)),
@@ -127,7 +156,8 @@ export const api = {
   answers: (id: string, body: { answers?: Record<string, unknown>; confirm?: string[]; conflict_choices?: Record<string, unknown> }) =>
     post<CaseOut>(`/api/cases/${id}/answers`, body),
   editInReview: (id: string, answers: Record<string, unknown>) => post<CaseOut>(`/api/cases/${id}/review/edit`, { answers }),
-  approve: (id: string, confirm: string[], note?: string) => post<CaseOut>(`/api/cases/${id}/approve`, { confirm, note }),
+  approve: (id: string, confirm: string[], note?: string, acknowledge: string[] = []) =>
+    post<CaseOut>(`/api/cases/${id}/approve`, { confirm, note, acknowledge }),
   exportDocs: (id: string, formats: Record<string, string[]>) => post<CaseOut>(`/api/cases/${id}/export`, { formats }),
   reopen: (id: string) => post<CaseOut>(`/api/cases/${id}/reopen`),
   finish: (id: string) => post<CaseOut>(`/api/cases/${id}/finish`),

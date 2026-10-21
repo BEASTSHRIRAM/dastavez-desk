@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { api, type WorkspaceInfo } from "@/lib/api";
+import Link from "next/link";
+import { api, type TemplateInfo, type WorkspaceInfo } from "@/lib/api";
 import { Shell } from "@/components/Shell";
 import { Button, EmptyState, Notice, Spinner } from "@/components/ui";
 import { Stage } from "@/components/scene/Stage";
@@ -14,6 +15,7 @@ export default function Workspaces() {
   const { session } = useAuth();
   const router = useRouter();
   const [list, setList] = useState<WorkspaceInfo[] | null>(null);
+  const [mine, setMine] = useState<TemplateInfo[]>([]);
   const [error, setError] = useState("");
   const [active, setActive] = useState<string>("");
   const [starting, setStarting] = useState("");
@@ -22,13 +24,17 @@ export default function Workspaces() {
   useEffect(() => {
     if (!session) return;
     api.workspaces().then((w) => { setList(w); setActive(window.location.hash.slice(1) || w[0].id); }).catch((e) => setError(e.message));
+    api.templates().then((t) => {
+      const own = t.filter((x) => x.owned_by_business && x.approved).reverse(); // API lists oldest first
+      setMine(own.filter((x, i) => own.findIndex((y) => y.key === x.key) === i)); // newest approved version of each
+    }).catch(() => {});
   }, [session]);
 
-  async function start(id: string) {
-    setStarting(id);
+  async function start(id: string, templateKey?: string) {
+    setStarting(templateKey ?? id);
     try {
       // The idempotency key makes a double click return the same case instead of creating two.
-      const c = await api.createCase(id, `${key.current}-${id}`);
+      const c = await api.createCase(id, `${key.current}-${templateKey ?? id}`, templateKey);
       router.push(`/desk/${c.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the job.");
@@ -72,6 +78,29 @@ export default function Workspaces() {
               </li>
             ))}
           </ul>
+
+          <section className="mt-10" aria-labelledby="own-h">
+            <h2 id="own-h" className="font-display text-2xl">Your own templates</h2>
+            {mine.length === 0 ? (
+              <p className="mt-1 max-w-[56ch] text-muted">
+                Work from your own wording instead. Upload a past draft and it becomes a template that asks only for the details that change.{" "}
+                <Link href="/templates/new" className="text-cobalt underline underline-offset-4">Add your own template</Link>
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y divide-rule-soft border-y border-rule-soft">
+                {mine.map((t) => (
+                  <li key={t.key} className="flex flex-wrap items-center justify-between gap-3 py-4">
+                    <div>
+                      <p className="font-display text-[1.25rem]">{t.title}</p>
+                      <p className="text-[0.875rem] text-muted">Version {t.version}. Asks for {t.fields.length} details.</p>
+                    </div>
+                    <Button onClick={() => start("custom", t.key)} busy={starting === t.key} disabled={!canWrite || !!starting}>Start a job</Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {mine.length > 0 && <p className="mt-2 text-[0.875rem]"><Link href="/templates/new" className="text-cobalt underline underline-offset-4">Add another template</Link></p>}
+          </section>
         </div>
         <div className="hidden lg:block">
           <div className="sticky top-8 h-[min(72dvh,640px)]">

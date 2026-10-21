@@ -94,6 +94,7 @@ const documentPreview = z.strictObject({
 });
 
 const issue = z.strictObject({
+  key: z.string().nullable().optional(),
   field_id: z.string().nullable().optional(),
   code: z.string(),
   severity: z.enum(["error", "warning"]),
@@ -106,6 +107,7 @@ const approvalPanel = z.strictObject({
   confirm_fields: z.array(z.strictObject({ field_id: z.string(), label: z.string(), value: z.unknown() })),
   can_approve: z.boolean(),
   approved: z.boolean(),
+  acknowledgements: z.array(z.strictObject({ key: z.string(), message: z.string() })),
   disclaimers: z.array(z.string()),
 });
 
@@ -116,9 +118,15 @@ const exportOptions = z.strictObject({
   exported: z.array(z.record(z.string(), z.unknown())),
 });
 
+const clientMessage = z.strictObject({
+  component: z.literal("client_message"),
+  title: z.string(),
+  text: z.string(),
+});
+
 const component = z.union([
   fieldComponent, missingInfo, conflictChoice, sourceEvidence, fileAttachment, documentChecklist,
-  changeComparison, documentPreview, approvalPanel, exportOptions,
+  changeComparison, documentPreview, approvalPanel, exportOptions, clientMessage,
 ]);
 
 export const manifestSchema = z.strictObject({
