@@ -9,6 +9,7 @@ os.environ["STORAGE_DIR"] = str(_TMP / "storage")
 os.environ["LLM_PROVIDER"] = "demo"
 os.environ["STT_PROVIDER"] = "demo"
 os.environ["SECRET_KEY"] = "test-secret"
+os.environ["SEED_DEMO"] = "true"
 
 import pytest  # noqa: E402
 from sqlalchemy import select  # noqa: E402

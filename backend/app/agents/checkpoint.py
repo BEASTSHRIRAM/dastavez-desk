@@ -22,10 +22,14 @@ def get_checkpointer():
         import psycopg
         from langgraph.checkpoint.postgres import PostgresSaver
         from psycopg.rows import dict_row
-        url = s.database_url.replace("postgresql+psycopg://", "postgresql://")
-        conn = psycopg.connect(url, autocommit=True, row_factory=dict_row)
+        url = s.db_url.replace("postgresql+psycopg://", "postgresql://")
+        # prepare_threshold=None keeps this working behind Supabase's transaction pooler
+        conn = psycopg.connect(url, autocommit=True, row_factory=dict_row, prepare_threshold=None)
         _saver = PostgresSaver(conn)
         _saver.setup()
+        from app import db
+        from app.db_security import lock_down_postgres
+        lock_down_postgres(db.engine)  # the checkpoint tables are created here, so lock them too
     return _saver
 
 

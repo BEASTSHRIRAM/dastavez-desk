@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.config import get_settings
+from app.config import get_settings, normalize_db_url
 
 
 class Base(DeclarativeBase):
@@ -11,9 +11,12 @@ class Base(DeclarativeBase):
 
 
 def make_engine(url: str | None = None):
-    url = url or get_settings().database_url
-    kwargs = {"connect_args": {"check_same_thread": False}} if url.startswith("sqlite") else {"pool_pre_ping": True}
-    return create_engine(url, **kwargs)
+    settings = get_settings()
+    url = normalize_db_url(url) if url else settings.db_url
+    if url.startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False})
+    connect_args = {"prepare_threshold": None} if settings.is_pooled else {}
+    return create_engine(url, pool_pre_ping=True, pool_recycle=1800, connect_args=connect_args)
 
 
 engine = make_engine()

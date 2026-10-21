@@ -3,7 +3,9 @@ All people, addresses and numbers below are invented."""
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import Base, engine
+from app.db_security import lock_down_postgres
 from app.models import orm
 from app.services.auth import hash_password
 from app.templates.builder import TEMPLATES, ensure_templates, template_file
@@ -77,7 +79,9 @@ def bootstrap() -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as session:
         seed_templates(session)
-        seed_demo(session)
+        if get_settings().seed_demo:
+            seed_demo(session)
+    lock_down_postgres(engine)
 
 
 if __name__ == "__main__":
