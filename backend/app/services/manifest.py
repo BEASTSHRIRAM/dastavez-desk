@@ -128,7 +128,8 @@ def _questions(m: ManifestInput) -> UiManifest:
         sections.append(Section(title="Application form", components=[FileAttachment(
             label="Upload the application form", kind="form", accept=[".pdf", ".docx", ".txt"],
             help="Only the field labels are read. Map each to an answer below.",
-            uploaded=[{"id": a.id, "name": a.original_name} for a in m.attachments if a.kind == "form"],
+            uploaded=[{"id": a.id, "name": a.original_name, "fields": list(a.meta.get("fields", []))}
+                      for a in m.attachments if a.kind == "form"],
             mapping=m.form_mapping, mappable_fields=[{"id": s.id, "label": s.label} for s in ev.active])]))
     optional = [_field_component(m, s, optional=True) for s in ev.active
                 if not s.required and s.id not in ev.values and s.id not in asked and s.type != FieldType.PARTY]

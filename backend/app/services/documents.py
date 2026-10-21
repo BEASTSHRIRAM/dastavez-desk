@@ -137,7 +137,7 @@ def preview(config: WorkspaceConfig, ev: Evaluation, src: Sources, plan: DocPlan
             "formats": plan.spec.formats, "is_sample": True}
     if plan.spec.kind == "ledger":
         table = _ledger_table(config, ev, "Draft - pending approval")
-        return {**base, "blocks": [{"type": "table", "rows": table}], "changes": [], "template": None}
+        return {**base, "blocks": [{"type": "table", "rows": table, "header": True}], "changes": [], "template": None}
     if plan.template is None:
         return {**base, "blocks": [], "changes": [], "template": None, "unavailable": plan.issue.message if plan.issue else "No template"}
     path = template_file(plan.template.template_key, plan.template.version)

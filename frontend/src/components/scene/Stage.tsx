@@ -34,13 +34,13 @@ export function useReduce3D(): { reduced: boolean; setReduced: (v: boolean) => v
   };
 }
 
-export function Stage({ material, mode = "idle", shift = 0, className = "", label }: {
-  material: Material; mode?: SceneMode; shift?: number; className?: string; label?: string;
+export function Stage({ material, mode = "idle", shift = 0, intro = true, className = "", label }: {
+  material: Material; mode?: SceneMode; shift?: number; intro?: boolean; className?: string; label?: string;
 }) {
   const { reduced, ready } = useReduce3D();
   if (!ready) return <div className={className} aria-hidden />;
   if (reduced) return <StaticStack material={material} className={className} label={label} />;
-  return <Installation material={material} mode={mode} shift={shift} className={className} label={label} />;
+  return <Installation material={material} mode={mode} shift={shift} intro={intro} className={className} label={label} />;
 }
 
 /** Static fallback: the same sheets, drawn flat. No WebGL, no motion. */

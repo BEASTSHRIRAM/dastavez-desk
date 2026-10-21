@@ -64,7 +64,7 @@ function Scene({ material, mode, offsetX, intro }: SceneProps) {
           const pose = padded(material)[i];
           m.position.set(pose.p[0] + (Math.sin(i * 7) * 2), 9 + i * 0.3, pose.p[2] + Math.cos(i * 5) * 2);
           m.rotation.set(Math.sin(i) * 0.8, Math.cos(i * 2) * 1.5, Math.sin(i * 3) * 0.6);
-          m.scale.setScalar(intro ? pose.s : pose.s);
+          m.scale.setScalar(pose.s);
         });
         if (!intro) meshes.forEach((m, i) => { const p = poses[i]; m.position.set(...p.p); m.rotation.set(...p.r); });
         else {
