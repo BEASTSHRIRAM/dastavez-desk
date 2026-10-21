@@ -1,36 +1,20 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dastavez Desk: web app
 
-## Getting Started
-
-First, run the development server:
+Next.js (App Router), Tailwind CSS 4, GSAP, React Three Fiber, Zod. See the [root README](../README.md) for setup,
+configuration, the workflow and the security model.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local     # NEXT_PUBLIC_API_URL, default http://localhost:8000
+npm run dev                    # http://localhost:3000
+npx tsc --noEmit               # type-check
+npm run build                  # production build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Notes for working here:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The app is client-driven (token auth, microphone, WebGL), so Cache Components is turned off in `next.config.ts`.
+- Everything the agent returns is rendered through `src/lib/manifest.ts`, a strict schema with a closed list of
+  components. Add a component there and in `features/desk/ManifestView.tsx`, never render server-provided markup.
+- 3D lives in `src/components/scene/`. It falls back to a static drawing for reduced motion, a stored "Reduce 3D"
+  preference, or no WebGL.
