@@ -1,0 +1,19 @@
+# PostgreSQL for production-like runs. The app also works without it (SQLite) for quick local trials.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dastavez
+      POSTGRES_PASSWORD: dastavez
+      POSTGRES_DB: dastavez
+    ports:
+      - "5432:5432"
+    volumes:
+      - dastavez-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dastavez"]
+      interval: 3s
+      retries: 20
+
+volumes:
+  dastavez-pg:
