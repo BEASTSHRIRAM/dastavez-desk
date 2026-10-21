@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 from app import db
 from app.repositories.cases import TenantRepo
 from app.repositories.catalog import PartyRepo, TemplateRepo
+from app.seed import bootstrap_once
 from app.services.auth import Principal, read_token
 
 
 def get_session() -> Iterator[Session]:
+    bootstrap_once()  # no-op after the first call; covers runtimes that skip the startup hook
     # looked up at call time so tests and settings reloads see the current SessionLocal
     with db.SessionLocal() as session:
         yield session

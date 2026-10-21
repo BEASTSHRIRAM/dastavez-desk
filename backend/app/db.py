@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.config import get_settings, normalize_db_url
+from app.config import ON_VERCEL, get_settings, normalize_db_url
 
 
 class Base(DeclarativeBase):
@@ -14,6 +14,9 @@ def make_engine(url: str | None = None):
     settings = get_settings()
     url = normalize_db_url(url) if url else settings.db_url
     if url.startswith("sqlite"):
+        if ON_VERCEL:
+            raise RuntimeError("DATABASE_URL is not set. Vercel's disk is read-only and per-instance, so SQLite cannot be used "
+                               "there. Add your Supabase (or any PostgreSQL) connection string as DATABASE_URL.")
         return create_engine(url, connect_args={"check_same_thread": False})
     connect_args = {"prepare_threshold": None} if settings.is_pooled else {}
     return create_engine(url, pool_pre_ping=True, pool_recycle=1800, connect_args=connect_args)

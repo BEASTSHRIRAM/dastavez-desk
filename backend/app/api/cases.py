@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app import db
+from app.config import get_settings
 from app.agents import runner
 from app.agents.nodes import NotApproved, assert_approved
 from app.api import deps
@@ -158,7 +159,12 @@ def start_intake(case_id: str, body: IntakeIn, tasks: BackgroundTasks, p: Princi
     cc = load(session, p, case_id)
     _need_status(cc, "intake")
     cc.repo.update_case(cc.case, status="processing", transcript=body.transcript)
-    tasks.add_task(runner.start, p.tenant_id, cc.case.id, cc.case.thread_id, p.user_id, cc.case.workspace, body.transcript)
+    args = (p.tenant_id, cc.case.id, cc.case.thread_id, p.user_id, cc.case.workspace, body.transcript)
+    if get_settings().workflow_inline:  # serverless: a background task may be frozen once the response is sent
+        runner.start(*args)
+        session.expire_all()  # the graph wrote through its own sessions; do not trust this session's cached case
+        return {"status": load(session, p, case_id).case.status}
+    tasks.add_task(runner.start, *args)
     return {"status": "processing"}
 
 
@@ -168,6 +174,10 @@ def retry(case_id: str, tasks: BackgroundTasks, p: Principal = Depends(deps.requ
     cc = load(session, p, case_id)
     _need_status(cc, "failed")
     cc.repo.update_case(cc.case, status="processing")
+    if get_settings().workflow_inline:
+        runner.retry(p.tenant_id, cc.case.id, cc.case.thread_id)
+        session.expire_all()
+        return {"status": load(session, p, case_id).case.status}
     tasks.add_task(runner.retry, p.tenant_id, cc.case.id, cc.case.thread_id)
     return {"status": "processing"}
 
@@ -299,7 +309,7 @@ def list_events(case_id: str, after: int = 0, p: Principal = Depends(deps.princi
 
 
 @router.get("/cases/{case_id}/events/stream")
-def stream_events(case_id: str, request: Request, after: int = 0, max_seconds: int = 600,
+def stream_events(case_id: str, request: Request, after: int = 0, max_seconds: int | None = None,
                   p: Principal = Depends(deps.principal)):
     """Server-Sent Events. Only typed progress messages are sent, never model reasoning.
     No request-scoped DB session here: one held open for the whole stream would sit 'idle in
@@ -307,9 +317,11 @@ def stream_events(case_id: str, request: Request, after: int = 0, max_seconds: i
     with db.SessionLocal() as check:
         load(check, p, case_id)  # 404 before the stream opens; the session closes immediately
 
+    cap = max_seconds or get_settings().sse_max_seconds  # short on serverless; the browser reconnects from the last event id
+
     def gen():
         last, started, idle = after, time.monotonic(), 0
-        while time.monotonic() - started < max_seconds:
+        while time.monotonic() - started < cap:
             with db.SessionLocal() as s:
                 events = TenantRepo(s, p.tenant_id).events_after(case_id, last)
             for e in events:

@@ -1,9 +1,12 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+ON_VERCEL = bool(os.environ.get("VERCEL"))  # Vercel sets this on every deployment and in `vercel dev`
 
 
 def normalize_db_url(url: str) -> str:
@@ -23,9 +26,19 @@ class Settings(BaseSettings):
 
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'dastavez.db').as_posix()}"
     secret_key: str = "dev-only-secret"
-    storage_dir: Path = BACKEND_DIR / "storage"
+    # On Vercel the only writable place is /tmp, and it is per-instance: durable files go to Supabase Storage (below).
+    storage_dir: Path = Field(default_factory=lambda: Path("/tmp/dastavez") if ON_VERCEL else BACKEND_DIR / "storage")
     token_ttl_seconds: int = 60 * 60 * 12
 
+    # Durable file storage. With both set, every upload, generated file and template is mirrored to a private
+    # Supabase Storage bucket and restored on demand, so files survive serverless instances and restarts.
+    supabase_url: str = ""  # https://PROJECTREF.supabase.co
+    supabase_service_key: str = ""  # the service_role key. Backend only; never expose it to the browser.
+    supabase_bucket: str = "dastavez"
+    # Serverless functions may be frozen right after responding, so the workflow runs inside the request there.
+    workflow_inline: bool = Field(default_factory=lambda: ON_VERCEL)
+    bootstrap_on_start: bool = True  # create tables and seed on start. Set false after the first deploy to cut cold starts.
+    sse_max_seconds: int = Field(default_factory=lambda: 50 if ON_VERCEL else 600)  # the browser reconnects after this
     seed_demo: bool = True  # fictional demo businesses and logins; set false for a real deployment
     llm_provider: str = "demo"
     llm_api_key: str = ""
@@ -44,6 +57,10 @@ class Settings(BaseSettings):
     @property
     def db_url(self) -> str:
         return normalize_db_url(self.database_url)
+
+    @property
+    def remote_storage(self) -> bool:
+        return bool(self.supabase_url and self.supabase_service_key)
 
     @property
     def is_sqlite(self) -> bool:

@@ -120,6 +120,7 @@ def build(body: BuildIn, p: Principal = Depends(deps.require("operator")), sessi
         result = studio.build(src, sels, out)
     except studio.StudioError as exc:
         raise HTTPException(422, str(exc)) from None
+    storage.commit(p.tenant_id, "templates", stored)  # durable copy of the template's wording
     fields: list[FieldSpec] = result["fields"]
     verify: list[str] = []
     if body.add_verification_checks:

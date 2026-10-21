@@ -85,7 +85,7 @@ extractor, no AI service, no credentials. Every workflow works offline.
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # Windows PowerShell. On macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # production dependencies plus pytest
 cp .env.example .env                 # Windows: Copy-Item .env.example .env
 uvicorn app.main:app --reload --port 8000
 
@@ -116,9 +116,11 @@ API docs (Swagger): **http://localhost:8000/docs**.
 | `GROQ_STT_MODEL` | `whisper-large-v3-turbo` | Used only if `STT_PROVIDER=groq`. |
 | `LLM_API_KEY`, `LLM_MODEL` | empty | For `anthropic` or `openai`. |
 | `STT_PROVIDER`, `STT_API_KEY` | `demo` | `demo`, `groq` or `openai` server-side transcription. |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_BUCKET` | empty, `dastavez` | Durable file storage (see Vercel below). Service key is backend only. |
+| `BOOTSTRAP_ON_START` | `true` | Run the idempotent startup checks. |
 | `SOFFICE_PATH` | auto-detected | Path to LibreOffice's `soffice` if it is not on `PATH`. |
 
-`frontend/.env.local`: `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). Never put a secret in a
+`frontend/.env.local`: `NEXT_PUBLIC_API_URL` (`http://localhost:8000` for the two-server local setup; leave it unset on Vercel so the app calls `/api` on its own domain). Never put a secret in a
 `NEXT_PUBLIC_` variable.
 
 ### Turning on AI (Groq)
@@ -150,6 +152,41 @@ grants. Verify in the Supabase dashboard that every table shows RLS enabled.
 
 The repository also contains `.mcp.json` pointing at the Supabase MCP server for this project. Authenticate it
 once with `claude /mcp`. It contains a project reference, not a secret.
+
+### Deploying to Vercel (one project, two services)
+
+`vercel.json` at the repo root defines two services on one domain:
+
+| Service | Folder | Public path |
+|---|---|---|
+| `frontend` (Next.js) | `frontend/` | everything except `/api/...` |
+| `backend` (FastAPI) | `backend/` | `/api/...` |
+
+A service receives the original request path, so the backend's routes (all under `/api`) need no prefix changes.
+The browser calls the backend on the same domain, so no CORS setup and **no service bindings** are needed: the two
+services never call each other server-side.
+
+Serverless hosting changes four things, and the code adapts to each when it detects Vercel:
+
+1. **Database.** SQLite cannot work (read-only, per-instance disk). Set `DATABASE_URL` to your Supabase connection
+   string; the app refuses to start on Vercel with SQLite and says why.
+2. **Files.** Local disk is temporary, so uploads, generated documents and your own templates are mirrored to a
+   **private Supabase Storage bucket** and restored on demand. Set `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` (the
+   `service_role` key, backend only). The bucket (`SUPABASE_BUCKET`, default `dastavez`) is created automatically.
+   Without these, files only survive on one instance and downloads will fail intermittently.
+3. **The workflow runs inside the request.** A background task could be frozen once the response is sent, so on
+   Vercel the intake call returns after the run finishes (a few seconds with the rule engine, longer with a hosted model).
+4. **Progress stream.** The event stream ends after 50 seconds and the browser reconnects from the last event it saw.
+
+Set these in the Vercel project's Environment Variables: `DATABASE_URL`, `SECRET_KEY`, `SUPABASE_URL`,
+`SUPABASE_SERVICE_KEY`, and optionally `SEED_DEMO`, `LLM_PROVIDER`, `GROQ_API_KEY`. **Do not set
+`NEXT_PUBLIC_API_URL`**: leaving it unset makes the app call `/api` on its own domain.
+
+Limits to know before you deploy: **PDF export is unavailable on Vercel** (no LibreOffice or Word there; DOCX still
+works and the app says so). Each cold start runs a few idempotent database checks (about 2 seconds); after the first
+good deploy you can set `BOOTSTRAP_ON_START=false`. The per-case lock that serialises two simultaneous clicks is
+per-instance. Run everything locally the Vercel way with `vercel dev`, after deleting `NEXT_PUBLIC_API_URL` from
+`frontend/.env.local`.
 
 ### PDF export
 
@@ -247,13 +284,14 @@ backend/
     templates/      builder for the bundled demonstration .docx templates (files/ is generated)
     verticals/      workspace configs as data: legal, property, government, travel, accounting, custom
   alembic/          migrations (0001 schema, 0002 row-level security, 0003 custom-template fields)
-  tests/            93 tests
+  tests/            109 tests
 frontend/
   src/app/          pages: landing, login, workspaces, cases, templates, templates/new, desk/[id]
   src/components/   shell, UI kit, 3D scene (React Three Fiber)
   src/features/     desk: voice intake, manifest renderer, document paper, approval and export
   src/lib/          typed API client, strict manifest schema, auth
 scripts/            setup.ps1, dev.ps1
+vercel.json         two-service Vercel deployment (frontend + backend)
 docker-compose.yml  optional local PostgreSQL
 ```
 
@@ -307,7 +345,7 @@ beyond what your database provider offers, and an enterprise permissions model. 
 
 ```powershell
 cd backend
-.\.venv\Scripts\python -m pytest -q          # 93 tests, SQLite, about 2 minutes
+.\.venv\Scripts\python -m pytest -q          # 109 tests, SQLite, about 2 minutes
 cd ..\frontend
 npx tsc --noEmit
 npm run build

@@ -1,5 +1,7 @@
 """Idempotent bootstrap: tables, template registry and fictional demonstration data.
 All people, addresses and numbers below are invented."""
+import threading
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -88,6 +90,23 @@ def ensure_columns() -> None:
             for name, ddl in cols:
                 if name not in have:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+
+_ready = threading.Lock()
+_done = False
+
+
+def bootstrap_once() -> None:
+    """Run bootstrap at most once per process, whichever comes first: the app's startup hook or the first request.
+    (A serverless runtime may not run startup hooks, so the first database use makes sure it happened.)"""
+    global _done
+    if _done:
+        return
+    with _ready:
+        if not _done:
+            if get_settings().bootstrap_on_start:
+                bootstrap()
+            _done = True
 
 
 def bootstrap() -> None:

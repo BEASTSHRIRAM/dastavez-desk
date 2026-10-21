@@ -1,0 +1,13 @@
+# Keep deployments small and never ship local state or secrets.
+backend/.venv
+backend/tests
+backend/storage
+backend/*.db
+backend/.env
+backend/.pytest_cache
+**/__pycache__
+frontend/node_modules
+frontend/.next
+frontend/.env.local
+scripts
+docker-compose.yml

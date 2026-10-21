@@ -7,12 +7,13 @@ from fastapi.responses import JSONResponse
 from app.api import cases, catalog, files, studio
 from app.config import get_settings
 from app.repositories.cases import NotFound
-from app.seed import bootstrap
+from app.services.storage import StorageError
+from app.seed import bootstrap_once
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    bootstrap()  # tables (SQLite dev), template registry and fictional demo data; idempotent
+    bootstrap_once()  # tables, template registry and (optionally) fictional demo data; idempotent
     yield
 
 
@@ -22,6 +23,11 @@ app.add_middleware(CORSMiddleware, allow_origins=list(get_settings().cors_origin
                    allow_methods=["*"], allow_headers=["*"])
 for r in (catalog.router, cases.router, files.router, studio.router):
     app.include_router(r)
+
+
+@app.exception_handler(StorageError)
+async def storage_down(_: Request, exc: StorageError):
+    return JSONResponse({"detail": str(exc)}, status_code=503)
 
 
 @app.exception_handler(NotFound)

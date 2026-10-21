@@ -375,6 +375,7 @@ def run_exports(cc: CaseContext, formats: dict[str, list[str]], actor: str | Non
             if not path.exists() or path.stat().st_size == 0:
                 failures.append(f"{plan.spec.title}: the {fmt.upper()} file was not created.")
                 continue
+            storage.commit(cc.case.tenant_id, "documents", stored)  # durable copy, so any instance can serve the download
             doc = cc.repo.add_document(cc.case.id, doc_key=plan.spec.key, title=plan.spec.title, fmt=fmt,
                                        stored_name=stored, is_sample=True, approval_id=approval_id)
             ids.append(doc.id)

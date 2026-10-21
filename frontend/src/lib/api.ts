@@ -1,6 +1,8 @@
 import { parseManifest, type Manifest } from "./manifest";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Empty means same origin: on Vercel (and `vercel dev`) the API is served at /api on the same domain.
+// For the classic two-server local setup, frontend/.env.local sets NEXT_PUBLIC_API_URL=http://localhost:8000.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const TOKEN_KEY = "dastavez.token";
 
 let memoryToken: string | null = null;
