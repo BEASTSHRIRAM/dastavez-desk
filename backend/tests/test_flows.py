@@ -143,3 +143,17 @@ def test_bookkeeping_expense_uses_exact_decimals_and_exports_valid_spreadsheet()
     assert wb.active["J2"].number_format == "#,##0.00"
     csv_doc = next(d for d in out["documents"] if d["fmt"] == "csv")
     assert b"3559.32" in download(h, csv_doc["id"])
+
+
+def test_missing_details_come_with_a_ready_to_send_client_message():
+    h = login()
+    case = new_case(h, "legal", "Prepare a declaration. The applicant is Anita Verma, the new address is 14 Lake View Road, Pune.")
+    m = manifest(h, case["id"])
+    [note] = components(m, "client_message")
+    assert "Declaration date" in note["text"] and "Jurisdiction" in note["text"]
+    assert "Operator" not in note["text"] and "read these facts back" not in note["text"]  # operator-only checks stay out
+    gov = new_case(h, "government")
+    client.post(f"/api/cases/{gov['id']}/attachments/sample-form", headers=h)
+    review = manifest(h, gov["id"])
+    [msg] = components(review, "client_message")
+    assert "Please send or bring" in msg["text"] and "Proof of new address" in msg["text"]

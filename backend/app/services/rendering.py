@@ -70,10 +70,10 @@ def read_blocks(path: Path) -> list[dict[str, Any]]:
             rows = [[c.text.strip() for c in r.cells] for r in item.rows]
             # a header row is one whose every non-empty run is bold (key/value tables only bold the label column)
             runs = [run for c in item.rows[0].cells for par in c.paragraphs for run in par.runs if run.text.strip()] if item.rows else []
-            header = len(item.rows[0].cells) > 1 and bool(runs) and all(run.bold for run in runs)
+            is_header = len(item.rows[0].cells) > 1 and bool(runs) and all(run.bold for run in runs)
             rows = [r for r in rows if any(r)]
             if rows:
-                blocks.append({"type": "table", "rows": rows, "header": header})
+                blocks.append({"type": "table", "rows": rows, "header": is_header})
     return [{"type": "header", "text": header}, *blocks, {"type": "footer", "text": footer}]
 
 

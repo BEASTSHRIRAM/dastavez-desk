@@ -47,3 +47,4 @@ class Issue(BaseModel):
     code: str  # missing | invalid | conflict | unconfirmed | unverified | template
     severity: str = "error"  # error blocks approval; warning is surfaced
     message: str
+    key: str | None = None  # stable id so a person can acknowledge a finding

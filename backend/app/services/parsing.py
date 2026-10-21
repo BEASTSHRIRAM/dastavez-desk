@@ -160,3 +160,45 @@ def parse_date(text: str, today: date, bias: str = "future") -> tuple[date, bool
 
 def format_date_long(d: date) -> str:
     return f"{d.day} {d.strftime('%B %Y')}"
+
+
+_ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
+         "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
+_TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+
+
+def _words_below_thousand(n: int) -> list[str]:
+    out: list[str] = []
+    if n >= 100:
+        out += [_ONES[n // 100], "Hundred"]
+        n %= 100
+        if n:
+            out.append("and")
+    if n >= 20:
+        out.append(_TENS[n // 10] + (f" {_ONES[n % 10]}" if n % 10 else ""))
+    elif n:
+        out.append(_ONES[n])
+    return out
+
+
+def int_to_words(n: int) -> str:
+    """Indian numbering: 1,25,000 is 'One Lakh Twenty Five Thousand'."""
+    if n == 0:
+        return "Zero"
+    parts: list[str] = []
+    for value, name in ((10_000_000, "Crore"), (100_000, "Lakh"), (1_000, "Thousand")):
+        if n >= value:
+            parts += [*_words_below_thousand(n // value), name]
+            n %= value
+    parts += _words_below_thousand(n)
+    return " ".join(parts)
+
+
+def amount_in_words(value: Decimal) -> str:
+    """'Rupees Eighteen Thousand only'. Deterministic, so a document never carries a number and a different spelling."""
+    d = quantize_money(Decimal(value))
+    rupees, paise = int(d), int((d - int(d)) * 100)
+    text = f"Rupees {int_to_words(rupees)}"
+    if paise:
+        text += f" and Paise {int_to_words(paise)}"
+    return text + " only"

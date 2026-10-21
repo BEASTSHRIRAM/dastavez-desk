@@ -17,7 +17,7 @@ from app.models.fields import FieldType
 from app.models.ui_manifest import UiManifest
 from app.repositories.catalog import get_tenant
 from app.services import answers as answers_svc
-from app.services import documents, extraction, forms, rendering, storage
+from app.services import documents, extraction, forms, rendering, reviewer, storage
 from app.services.case_state import values_hash
 from app.services.case_view import CaseContext
 from app.services.llm import DemoProvider, LLMError, get_llm_provider
@@ -122,6 +122,17 @@ def extract_structured_facts(state: WorkflowState) -> dict:
                   fields=sorted(set(stored)))
         repo.audit("facts_extracted", case.id, state.get("user_id"), fields=sorted(set(stored)), provider=provider.name)
     return {"extracted_fields": sorted(set(stored)), "notes": notes}
+
+
+def _reviewer_provider(cc):
+    """The reviewer runs only when the business consented to AI services and a real provider is configured."""
+    if not get_tenant(cc.session, cc.case.tenant_id).ai_consent:
+        return None
+    try:
+        prov = get_llm_provider()
+    except LLMError:
+        return None
+    return None if prov.name == "demo" else prov
 
 
 # 4 ------------------------------------------------------------------------------------------
@@ -244,6 +255,20 @@ def render_document_preview(state: WorkflowState) -> dict:
         ready = [p["doc_key"] for p in previews if p["blocks"]]
         cc.repo.emit(cc.case.id, "preview_ready", f"Rendered {len(ready)} document preview{'s' if len(ready) != 1 else ''}.",
                      docs=ready)
+        found = cc.consistency(ev, previews)
+        agent = _reviewer_provider(cc)
+        if agent:  # the reviewer agent: a second model reads the draft against what was said
+            primary = next((p for p in previews if p.get("primary") and p.get("blocks")), None)
+            if primary:
+                facts = {s.label: documents.display(s, ev.values[s.id]) for s in ev.active if s.id in ev.values and s.type.value != "party"}
+                extra, note = reviewer.safe_review(agent, cc.case.transcript or "", facts, rendering.blocks_plain_text(primary["blocks"]))
+                found += extra
+                cc.repo.emit(cc.case.id, "agent_review_done", note or f"The reviewer agent read the draft and raised {len(extra)} point{'s' if len(extra) != 1 else ''}.",
+                             count=len(extra))
+        cc.repo.set_extra(cc.case, consistency=[{"code": i.code, "severity": i.severity, "message": i.message, "key": i.key} for i in found])
+        if found:
+            cc.repo.emit(cc.case.id, "consistency_checked", f"Consistency check found {len(found)} thing{'s' if len(found) != 1 else ''} to look at.",
+                         count=len(found))
         cc.repo.audit("preview_generated", cc.case.id, state.get("user_id"), docs=ready)
     return {"preview_docs": ready}
 
@@ -274,6 +299,12 @@ def request_human_review(state: WorkflowState) -> dict:
             problems["_blocking"] = "Resolve the listed issues before approving."
         if must - offered:
             problems["_unconfirmed"] = "Confirm every highlighted value before approving."
+        found = (cc.case.extra or {}).get("consistency") or []
+        leaks = {c["key"] for c in found if c["code"] == "leak"}
+        if leaks - set(payload.get("acknowledge") or []):
+            problems["_leak"] = "Check each possible leftover from another client and tick it before approving."
+        if any(c["severity"] == "error" for c in found):
+            problems["_consistency"] = "A figure and its words disagree. Fix the document before approving."
         if problems:
             cc.repo.emit(cc.case.id, "validation_warning", next(iter(problems.values())), code="approval_blocked")
             return {"last_answer_errors": problems, "approval_status": "pending", "pending": "review"}
@@ -283,7 +314,8 @@ def request_human_review(state: WorkflowState) -> dict:
         h = values_hash(ev, {p.spec.key: p.template.id for p in plans if p.template})
         approval = cc.repo.add_approval(cc.case.id, state["user_id"], h, payload.get("note"))
         cc.repo.update_case(cc.case, status="approved")
-        cc.repo.audit("approved", cc.case.id, state["user_id"], approval_id=approval.id, values_hash=h)
+        cc.repo.audit("approved", cc.case.id, state["user_id"], approval_id=approval.id, values_hash=h,
+                      acknowledged=sorted(payload.get("acknowledge") or []))
         cc.repo.emit(cc.case.id, "approved", "Approved. You can export now.")
         return {"approval_status": "approved", "approval_id": approval.id, "last_answer_errors": {}}
 
@@ -293,7 +325,7 @@ def route_after_review(state: WorkflowState) -> str:
         return "__end__"
     if state.get("approval_status") == "approved":
         return "export_approved_documents"
-    if state.get("last_answer_errors") and set(state["last_answer_errors"]) <= {"_blocking", "_unconfirmed"}:
+    if state.get("last_answer_errors") and set(state["last_answer_errors"]) <= {"_blocking", "_unconfirmed", "_leak", "_consistency"}:
         return "build_dynamic_ui_manifest"
     return "select_approved_template"
 

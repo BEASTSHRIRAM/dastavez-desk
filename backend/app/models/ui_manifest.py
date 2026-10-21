@@ -112,6 +112,7 @@ class DocumentPreviewC(_Strict):
 
 
 class IssueItem(_Strict):
+    key: str | None = None
     field_id: str | None = None
     code: str
     severity: Literal["error", "warning"]
@@ -124,7 +125,15 @@ class ApprovalPanel(_Strict):
     confirm_fields: list[dict[str, Any]]  # high-impact values that must be confirmed: {field_id, label, value}
     can_approve: bool
     approved: bool = False
+    acknowledgements: list[dict[str, Any]] = Field(default_factory=list)  # possible leftovers a person must clear
     disclaimers: list[str] = Field(default_factory=list)
+
+
+class ClientMessage(_Strict):
+    """A ready-to-send request list for the client. The operator copies it; the app never sends anything."""
+    component: Literal["client_message"] = "client_message"
+    title: str
+    text: str
 
 
 class ExportDocument(_Strict):
@@ -142,7 +151,7 @@ class ExportOptions(_Strict):
 
 Component = Annotated[
     FieldComponent | MissingInfoWarning | ConflictChoice | SourceEvidence | FileAttachment | DocumentChecklist
-    | ChangeComparison | DocumentPreviewC | ApprovalPanel | ExportOptions,
+    | ChangeComparison | DocumentPreviewC | ApprovalPanel | ExportOptions | ClientMessage,
     Field(discriminator="component"),
 ]
 

@@ -67,6 +67,7 @@ class TemplateVersion(Base):
     approved: Mapped[bool] = mapped_column(default=True)
     jurisdiction: Mapped[str | None] = mapped_column(String(100))
     verify_fields: Mapped[list] = mapped_column(JSON, default=list)
+    field_specs: Mapped[list] = mapped_column(JSON, default=list)  # custom templates: the fields their placeholders need
     source_note: Mapped[str | None] = mapped_column(Text)
     last_verified: Mapped[str | None] = mapped_column(String(20))
 

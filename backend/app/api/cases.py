@@ -65,6 +65,7 @@ def _check_answers(cc: CaseContext, answers: dict[str, Any]) -> None:
 # ------------------------------------------------------------------ create / read
 class CaseIn(BaseModel):
     workspace: str
+    template_key: str | None = Field(default=None, max_length=60)  # required for workspace "custom"
     title: str | None = Field(default=None, max_length=200)
     transcript: str | None = Field(default=None, max_length=8000)
 
@@ -72,13 +73,22 @@ class CaseIn(BaseModel):
 @router.post("/cases", status_code=201)
 def create_case(body: CaseIn, p: Principal = Depends(deps.require("operator")), session: Session = Depends(deps.get_session),
                 idempotency_key: str | None = Header(default=None, max_length=80)):
-    if body.workspace not in WORKSPACES:
+    title = None
+    if body.workspace == "custom":
+        from app.repositories.catalog import TemplateRepo
+        approved = TemplateRepo(session, p.tenant_id).latest_approved(body.template_key or "")
+        if not approved or approved[0].tenant_id != p.tenant_id:
+            raise HTTPException(422, "That template is not approved yet. A business owner approves it in Templates first.")
+        title = f"{approved[0].title} case"
+    elif body.workspace not in WORKSPACES:
         raise HTTPException(422, "Unknown workspace.")
     repo = TenantRepo(session, p.tenant_id)
     case, created = repo.create_case(user_id=p.user_id, workspace=body.workspace, transcript=body.transcript,
-                                     title=body.title or f"{WORKSPACES[body.workspace].name} case",
+                                     title=body.title or title or f"{WORKSPACES[body.workspace].name} case",
                                      idempotency_key=idempotency_key)
     if created:
+        if body.workspace == "custom":
+            repo.set_extra(case, template_key=body.template_key)
         repo.audit("case_created", case.id, p.user_id, workspace=body.workspace)
     return case_out(CaseContext.load(session, p.tenant_id, case.id)) | {"created": created}
 
@@ -191,6 +201,7 @@ def edit_in_review(case_id: str, body: AnswersIn, p: Principal = Depends(deps.re
 
 class ApproveIn(BaseModel):
     confirm: list[str] = Field(default_factory=list)
+    acknowledge: list[str] = Field(default_factory=list)  # keys of possible-leftover findings the person checked
     note: str | None = Field(default=None, max_length=500)
 
 
@@ -199,7 +210,7 @@ def approve(case_id: str, body: ApproveIn, p: Principal = Depends(deps.require("
             session: Session = Depends(deps.get_session)):
     cc = load(session, p, case_id)
     _need_status(cc, "review")
-    _resume(cc, {"action": "approve", "confirm": body.confirm, "note": body.note})
+    _resume(cc, {"action": "approve", "confirm": body.confirm, "note": body.note, "acknowledge": body.acknowledge})
     out = case_out(load(session, p, case_id))
     if out["status"] != "approved":
         raise HTTPException(409, {"message": "The draft was not approved. Resolve the highlighted items first.",

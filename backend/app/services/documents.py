@@ -14,9 +14,9 @@ from app.models.orm import Party, TemplateVersion
 from app.repositories.catalog import TemplateRepo
 from app.services import exporting, rendering
 from app.services.case_state import Evaluation
-from app.services.parsing import format_date_long, format_inr
+from app.services.parsing import amount_in_words, format_date_long, format_inr
 from app.services.values import display
-from app.templates.builder import template_file
+from app.services.template_files import template_path
 from app.verticals.base import DocumentSpec, WorkspaceConfig
 
 MISSING = "[missing]"
@@ -86,11 +86,17 @@ def build_context(config: WorkspaceConfig, ev: Evaluation, src: Sources, plan: D
         ctx[spec.id] = wrap(spec.id, text) if text else (MISSING if spec.required and spec.id in {s.id for s in ev.active} else "")
         # templates branch on <field>_flag (a real bool); the plain field name holds display text
         ctx[f"{spec.id}_flag"] = ev.values.get(spec.id) is True
+    for spec in config.fields:  # every money field also gets an amount-in-words twin: <field>_words
+        v = ev.values.get(spec.id)
+        if spec.type.value == "currency" and isinstance(v, Decimal):
+            ctx[f"{spec.id}_words"] = wrap(spec.id, amount_in_words(v))
     for key, v in ev.computed.items():
         if isinstance(v, list):
             ctx[key] = v
         else:
             ctx[key] = _fmt_computed(key, v)
+            if isinstance(v, Decimal) and not key.endswith(("_months", "_pct")):
+                ctx[f"{key}_words"] = amount_in_words(v)
     p = src.party
     ctx["landlord_name"] = wrap("landlord_party", p.full_name) if p else MISSING
     ctx["landlord_address"] = wrap("landlord_party", p.address or "") if p and p.address else ""
@@ -140,7 +146,7 @@ def preview(config: WorkspaceConfig, ev: Evaluation, src: Sources, plan: DocPlan
         return {**base, "blocks": [{"type": "table", "rows": table, "header": True}], "changes": [], "template": None}
     if plan.template is None:
         return {**base, "blocks": [], "changes": [], "template": None, "unavailable": plan.issue.message if plan.issue else "No template"}
-    path = template_file(plan.template.template_key, plan.template.version)
+    path = template_path(plan.template)
     ctx = build_context(config, ev, src, plan, marker=True)
     tmp = rendering.render_docx(path, ctx, work_dir / f"preview_{plan.spec.key}.docx")
     return {**base, "blocks": rendering.read_blocks(tmp),
@@ -155,7 +161,7 @@ def export_file(config: WorkspaceConfig, ev: Evaluation, src: Sources, plan: Doc
     if plan.spec.kind == "ledger":
         rows = [exporting.ledger_row(ev.values, ev.computed, "Approved")]
         return exporting.write_xlsx(out, rows) if fmt == "xlsx" else exporting.write_csv(out, rows)
-    path = template_file(plan.template.template_key, plan.template.version)
+    path = template_path(plan.template)
     ctx = build_context(config, ev, src, plan, marker=False)
     if fmt == "docx":
         return rendering.render_docx(path, ctx, out)

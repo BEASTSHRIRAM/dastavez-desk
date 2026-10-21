@@ -78,10 +78,8 @@ def list_workspaces(_: Principal = Depends(deps.principal)):
 
 
 def _template_out(t):
-    return {"id": t.id, "key": t.template_key, "version": t.version, "workspace": t.workspace, "title": t.title,
-            "is_demo": t.is_demo, "approved": t.approved, "jurisdiction": t.jurisdiction,
-            "verify_fields": t.verify_fields, "note": t.source_note, "last_verified": t.last_verified,
-            "owned_by_business": t.tenant_id is not None}
+    from app.api.studio import template_out
+    return template_out(t)
 
 
 @router.get("/templates")

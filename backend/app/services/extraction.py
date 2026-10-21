@@ -123,7 +123,8 @@ SYSTEM_PROMPT = (
     "Return only JSON: {\"facts\": [{\"field_id\": str, \"value\": any, \"quote\": str, \"confidence\": 0-1}]}. "
     "Use only the listed field_ids. Each quote must be copied exactly from the text. "
     "Never invent or infer values that are not stated. Omit anything unstated. "
-    "Dates as YYYY-MM-DD, money as plain decimal numbers in INR, yes/no as true/false."
+    "Dates as YYYY-MM-DD, money as plain decimal numbers in INR, yes/no as true/false. "
+    "The text may be in any language. Keep names and addresses in the script they were written in, and quote exactly as written."
 )
 
 

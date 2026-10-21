@@ -74,9 +74,26 @@ def seed_demo(session: Session) -> None:
            address="1 Hidden Road, Nashik")
 
 
+def ensure_columns() -> None:
+    """create_all never alters existing tables. Add columns introduced after a database was first created
+    (idempotent), so an existing Supabase database keeps working without a manual migration."""
+    from sqlalchemy import inspect, text
+    wanted = {"template_versions": [("field_specs", "JSON")]}
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table, cols in wanted.items():
+            if not insp.has_table(table):
+                continue
+            have = {c["name"] for c in insp.get_columns(table)}
+            for name, ddl in cols:
+                if name not in have:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+
 def bootstrap() -> None:
     ensure_templates()
     Base.metadata.create_all(engine)
+    ensure_columns()
     with Session(engine) as session:
         seed_templates(session)
         if get_settings().seed_demo:

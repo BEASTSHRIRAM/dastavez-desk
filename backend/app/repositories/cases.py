@@ -67,6 +67,12 @@ class TenantRepo:
         return list(self.s.scalars(select(Fact).where(Fact.tenant_id == self.tenant_id, Fact.case_id == case_id)
                                    .order_by(Fact.created_at, Fact.id)))
 
+    def other_case_facts(self, case_id: str, field_ids: set[str], limit: int = 400) -> list[Fact]:
+        """Identity-like values from this business's *other* cases, for the residue check."""
+        return list(self.s.scalars(select(Fact).where(
+            Fact.tenant_id == self.tenant_id, Fact.case_id != case_id, Fact.field_id.in_(field_ids))
+            .order_by(Fact.created_at.desc()).limit(limit)))
+
     # ----- attachments
     def add_attachment(self, case_id: str, **kw: Any) -> Attachment:
         self.get_case(case_id)

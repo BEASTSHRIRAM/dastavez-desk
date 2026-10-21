@@ -232,3 +232,12 @@ def test_a_failed_run_keeps_its_answers_and_can_be_retried(session, ids, monkeyp
     runner.retry(ids["tenant_a"], case.id, case.thread_id)  # continues from the last checkpoint
     session.expire_all()
     assert repo.get_case(case.id).status == "review"
+
+
+def test_preview_keeps_the_page_header_banner_and_footer():
+    from app.services.rendering import read_blocks
+    from app.templates.builder import template_file
+    blocks = read_blocks(template_file("rental_agreement", "1.0"))
+    assert blocks[0]["type"] == "header" and "NOT LEGAL ADVICE" in blocks[0]["text"]
+    assert blocks[-1]["type"] == "footer" and "Draft pending human review" in blocks[-1]["text"]
+    assert [b["header"] for b in blocks if b["type"] == "table"] == [False]  # key/value table has no header row

@@ -74,6 +74,11 @@ class TemplateRepo:
             raise NotFound("Template not found")
         return tv
 
+    def latest_any(self, template_key: str) -> list[TemplateVersion]:
+        """Every visible version of a key (approved or not), newest first."""
+        rows = self.s.scalars(select(TemplateVersion).where(self._visible(), TemplateVersion.template_key == template_key))
+        return sorted(rows, key=lambda t: tuple(int(p) if p.isdigit() else 0 for p in t.version.split(".")), reverse=True)
+
     def latest_approved(self, template_key: str) -> list[TemplateVersion]:
         """All approved versions of a key, highest version first. Tenant-owned versions rank above built-ins
         at the same version."""

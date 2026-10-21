@@ -7,7 +7,7 @@ from typing import Any
 
 from app.models.fields import FieldSpec, FieldType
 from app.models.orm import Case, Party
-from app.models.ui_manifest import (ApprovalPanel, ChangeComparison, ConflictChoice, ConflictOption, DocumentChecklist,
+from app.models.ui_manifest import (ApprovalPanel, ChangeComparison, ClientMessage, ConflictChoice, ConflictOption, DocumentChecklist,
                                     DocumentPreviewC, ExportDocument, ExportOptions, FieldComponent, FileAttachment,
                                     IssueItem, MissingInfoWarning, PartyOption, Provenance, Section, SourceEvidence,
                                     UiManifest, Validation)
@@ -36,6 +36,7 @@ class ManifestInput:
     pdf_available: bool = False
     approved: bool = False
     plan_issues: list[Any] = field(default_factory=list)
+    consistency: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _field_component(m: ManifestInput, spec: FieldSpec, *, optional: bool = False, confirm: bool = False) -> FieldComponent:
@@ -74,8 +75,10 @@ def _party_name(m: ManifestInput, spec: FieldSpec, party_id: str) -> str:
 
 
 def _issues(m: ManifestInput) -> list[IssueItem]:
-    return [IssueItem(field_id=i.field_id, code=i.code, severity=i.severity, message=i.message)
-            for i in [*m.ev.issues, *m.plan_issues]]
+    found = [IssueItem(field_id=i.field_id, code=i.code, severity=i.severity, message=i.message)
+             for i in [*m.ev.issues, *m.plan_issues]]
+    found += [IssueItem(key=c.get("key"), code=c["code"], severity=c["severity"], message=c["message"]) for c in m.consistency]
+    return found
 
 
 def build_manifest(m: ManifestInput, view: str | None = None) -> UiManifest:
@@ -91,6 +94,23 @@ def build_manifest(m: ManifestInput, view: str | None = None) -> UiManifest:
     if status == "review" or (view == "review" and status in ("approved", "exported")):
         return _review(m)
     return _export(m, complete=(status == "exported"))
+
+
+def _client_message(m: ManifestInput) -> ClientMessage | None:
+    """Deterministic request list: what the client still has to provide, and which papers to bring."""
+    cfg, ev = m.config, m.ev
+    asks = [s.label for s in ev.missing if s.id not in cfg.verify_fields and s.type != FieldType.PARTY]
+    papers = [p for p in ev.computed.get("checklist", []) if isinstance(p, str)]
+    if not asks and not papers:
+        return None
+    primary = next((d.title for d in cfg.documents if d.primary), "documents").lower()
+    lines = ["Hello,", "", f"To prepare your {primary}, I need a few things from you."]
+    if asks:
+        lines += ["", "Please tell me:", *[f"- {a}" for a in asks]]
+    if papers:
+        lines += ["", "Please send or bring:", *[f"- {p}" for p in papers]]
+    lines += ["", "Thank you."]
+    return ClientMessage(title="Message to the client", text="\n".join(lines))
 
 
 def _questions(m: ManifestInput) -> UiManifest:
@@ -124,6 +144,9 @@ def _questions(m: ManifestInput) -> UiManifest:
             asked.add(spec.id)
     if need:
         sections.append(Section(title="What I still need", description="Only what the job requires.", components=need))
+    note = _client_message(m)
+    if note:
+        sections.append(Section(title="Ask the client", description="Copy this into WhatsApp or email. Nothing is sent from here.", components=[note]))
     if cfg.id == "government":
         sections.append(Section(title="Application form", components=[FileAttachment(
             label="Upload the application form", kind="form", accept=[".pdf", ".docx", ".txt"],
@@ -149,6 +172,7 @@ def _review(m: ManifestInput) -> UiManifest:
     sections.append(Section(title="Approval", components=[ApprovalPanel(
         issues=issues, confirm_fields=[] if m.approved else confirm,
         can_approve=not any(i.severity == "error" for i in issues) and not m.approved, approved=m.approved,
+        acknowledgements=[] if m.approved else [{"key": c["key"], "message": c["message"]} for c in m.consistency if c["code"] == "leak"],
         disclaimers=cfg.disclaimers)]))
     for p in m.previews:
         comps: list = [DocumentPreviewC(doc_key=p["doc_key"], title=p["title"], blocks=p["blocks"],
@@ -161,6 +185,9 @@ def _review(m: ManifestInput) -> UiManifest:
             title="Supporting documents", items=ev.computed["checklist"], source=ev.computed.get("requirements_source"),
             last_verified=ev.computed.get("requirements_verified"))]))
     sections.append(Section(title="Where each value came from", components=[_evidence(m)]))
+    note = _client_message(m)
+    if note:
+        sections.append(Section(title="Ask the client", description="Copy this into WhatsApp or email. Nothing is sent from here.", components=[note]))
     if not m.approved:
         sections.append(Section(title="Edit details", description="Correct anything the draft got wrong. The draft updates after you save.",
                                 components=[_field_component(m, s) for s in ev.active]))
